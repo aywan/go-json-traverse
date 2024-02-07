@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 type state int
@@ -49,6 +50,7 @@ func main() {
 	}
 
 	stack := stateStackType{make([]state, 0, 100), valueState}
+	ident := 0
 
 	d := json.NewDecoder(in)
 	for {
@@ -61,7 +63,7 @@ func main() {
 			if stack.Top() != valueState {
 				log.Fatal("not value state")
 			}
-			fmt.Println("val null")
+			fmt.Println(strings.Repeat("  ", ident), "  - val null")
 			stack.Pop()
 			if stack.Top() == arrayState {
 				stack.Push(valueState)
@@ -74,11 +76,13 @@ func main() {
 			delim := token.(json.Delim)
 			switch delim {
 			case '{':
-				fmt.Println("object")
+				fmt.Println(strings.Repeat("  ", ident), "object")
+				ident++
 				stack.Push(objectState)
 
 			case '[':
-				fmt.Println("array")
+				fmt.Println(strings.Repeat("  ", ident), "array")
+				ident++
 				stack.Push(arrayState)
 				stack.Push(valueState)
 
@@ -86,13 +90,14 @@ func main() {
 				if stack.Pop() != objectState {
 					log.Fatal("not object state")
 				}
-				if stack.Top() == valueState {
-					stack.Pop()
+				if stack.Pop() != valueState {
+					log.Fatal("not value state")
 				}
 				if stack.Top() == arrayState {
 					stack.Push(valueState)
 				}
-				fmt.Println("end object")
+				ident--
+				fmt.Println(strings.Repeat("  ", ident), "end object")
 
 			case ']':
 				if stack.Pop() != valueState {
@@ -101,20 +106,21 @@ func main() {
 				if stack.Pop() != arrayState {
 					log.Fatal("not array state")
 				}
-				if stack.Top() == valueState {
-					stack.Pop()
+				if stack.Pop() != valueState {
+					log.Fatal("not value state")
 				}
-				fmt.Println("end array")
+				ident--
+				fmt.Println(strings.Repeat("  ", ident), "end array")
 			}
 		case string:
 			tokenStr := token.(string)
 			switch stack.Top() {
 			case objectState:
-				fmt.Println("key", tokenStr)
+				fmt.Println(strings.Repeat("  ", ident), "key", tokenStr)
 				stack.Push(valueState)
 
 			case valueState:
-				fmt.Println("val string", tokenStr)
+				fmt.Println(strings.Repeat("  ", ident), "  - val string", tokenStr)
 				stack.Pop()
 				if stack.Top() == arrayState {
 					stack.Push(valueState)
@@ -129,7 +135,7 @@ func main() {
 			if stack.Top() != valueState {
 				log.Fatal("not float64 state")
 			}
-			fmt.Println("val number", tokenFloat)
+			fmt.Println(strings.Repeat("  ", ident), "  - val number", tokenFloat)
 			stack.Pop()
 			if stack.Top() == arrayState {
 				stack.Push(valueState)
@@ -140,7 +146,7 @@ func main() {
 			if stack.Top() != valueState {
 				log.Fatal("not value state")
 			}
-			fmt.Println("val bool", tokenBool)
+			fmt.Println(strings.Repeat("  ", ident), "  - val bool", tokenBool)
 			stack.Pop()
 			if stack.Top() == arrayState {
 				stack.Push(valueState)
