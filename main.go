@@ -17,17 +17,29 @@ const (
 )
 
 type stateStackType struct {
-	stack []state
+	stack   []state
+	current state
 }
 
 func (s *stateStackType) Push(new state) {
-	s.stack = append(s.stack, new)
+	s.stack = append(s.stack, s.current)
+	s.current = new
 }
 
 func (s *stateStackType) Pop() state {
-	current := s.stack[len(s.stack)-1]
+	if len(s.stack) == 0 {
+		current := s.current
+		s.current = unknownState
+		return current
+	}
+	current := s.current
+	s.current = s.stack[len(s.stack)-1]
 	s.stack = s.stack[:len(s.stack)-1]
 	return current
+}
+
+func (s *stateStackType) Top() state {
+	return s.current
 }
 
 func main() {
@@ -36,8 +48,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	stateStack := stateStackType{make([]state, 0, 100)}
-	curState := valueState
+	stack := stateStackType{make([]state, 0, 100), valueState}
 
 	d := json.NewDecoder(in)
 	for {
@@ -46,55 +57,67 @@ func main() {
 			break
 		}
 
+		if token == nil {
+			if stack.Top() != valueState {
+				log.Fatal("not value state")
+			}
+			fmt.Println("val null")
+			stack.Pop()
+			if stack.Top() == arrayState {
+				stack.Push(valueState)
+			}
+			continue
+		}
+
 		switch token.(type) {
 		case json.Delim:
 			delim := token.(json.Delim)
 			switch delim {
 			case '{':
-				stateStack.Push(curState)
-				curState = objectState
+				fmt.Println("object")
+				stack.Push(objectState)
 
 			case '[':
-				stateStack.Push(curState)
-				stateStack.Push(arrayState)
-				curState = valueState
+				fmt.Println("array")
+				stack.Push(arrayState)
+				stack.Push(valueState)
 
 			case '}':
-				if curState != objectState {
+				if stack.Pop() != objectState {
 					log.Fatal("not object state")
 				}
-				curState = stateStack.Pop()
-				if curState == valueState {
-					curState = stateStack.Pop()
+				if stack.Top() == valueState {
+					stack.Pop()
 				}
+				if stack.Top() == arrayState {
+					stack.Push(valueState)
+				}
+				fmt.Println("end object")
 
 			case ']':
-				if curState != valueState {
+				if stack.Pop() != valueState {
 					log.Fatal("not value state")
 				}
-				curState = stateStack.Pop()
-				if curState != arrayState {
+				if stack.Pop() != arrayState {
 					log.Fatal("not array state")
 				}
-				curState = stateStack.Pop()
-				if curState == valueState {
-					curState = stateStack.Pop()
+				if stack.Top() == valueState {
+					stack.Pop()
 				}
+				fmt.Println("end array")
 			}
 		case string:
 			tokenStr := token.(string)
-			switch curState {
+			switch stack.Top() {
 			case objectState:
 				fmt.Println("key", tokenStr)
-				stateStack.Push(curState)
-				curState = valueState
+				stack.Push(valueState)
 
 			case valueState:
 				fmt.Println("val string", tokenStr)
-				curState = stateStack.Pop()
-				if curState == arrayState {
-					stateStack.Push(arrayState)
-					curState = valueState
+				stack.Pop()
+				if stack.Top() == arrayState {
+					stack.Push(valueState)
 				}
 
 			default:
@@ -103,15 +126,28 @@ func main() {
 
 		case float64:
 			tokenFloat := token.(float64)
-			if curState != valueState {
+			if stack.Top() != valueState {
 				log.Fatal("not float64 state")
 			}
-			fmt.Println("flo string", tokenFloat)
-			curState = stateStack.Pop()
-			if curState == arrayState {
-				stateStack.Push(arrayState)
-				curState = valueState
+			fmt.Println("val number", tokenFloat)
+			stack.Pop()
+			if stack.Top() == arrayState {
+				stack.Push(valueState)
 			}
+
+		case bool:
+			tokenBool := token.(bool)
+			if stack.Top() != valueState {
+				log.Fatal("not value state")
+			}
+			fmt.Println("val bool", tokenBool)
+			stack.Pop()
+			if stack.Top() == arrayState {
+				stack.Push(valueState)
+			}
+
+		default:
+			log.Fatal("unknown type")
 		}
 	}
 

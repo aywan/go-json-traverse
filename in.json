@@ -1,4 +1,18 @@
 {
+  "nilValue": null,
+  "boolValue": true,
+  "numberValue": 2,
+  "arrayAny": [
+    "x",
+    true,
+    false,
+    3.14,
+    {
+      "x": "y"
+    },
+    null,
+    0
+  ],
   "glossary": {
     "title": "example glossary",
     "GlossDiv": {
